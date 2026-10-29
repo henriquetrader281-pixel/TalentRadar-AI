@@ -159,8 +159,8 @@ def login(payload: LoginInput, request: Request, response: Response):
 
 
 @app.post("/api/logout")
-def logout(response: Response):
-    response.delete_cookie(COOKIE_NAME, path="/", httponly=True, secure=os.getenv("VERCEL") == "1", samesite="strict")
+def logout(request: Request, response: Response):
+    response.delete_cookie(COOKIE_NAME, path="/", httponly=True, secure=request.url.scheme == "https" or os.getenv("VERCEL") == "1", samesite="strict")
     return {"ok": True}
 
 
