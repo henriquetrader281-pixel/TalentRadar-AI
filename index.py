@@ -213,7 +213,7 @@ def create_job(payload: JobInput, _: dict = Depends(require_auth)):
                      mao_na_massa, link, link_whatsapp, palavras_chave_ats, observacoes, origem)
                 VALUES (%(empresa)s, %(cargo)s, %(cidade)s, %(salario)s, %(salario_num)s,
                         %(fit_score)s, %(categoria)s, %(mao_na_massa)s, %(link)s, %(link_whatsapp)s,
-                        %(palavras_chave_ats)s, %(observacoes)s, %(origem)s)
+                        %(palavras_chave_ats)s::jsonb, %(observacoes)s, %(origem)s)
                 RETURNING id
                 """,
                 {**values, "palavras_chave_ats": json.dumps(values["palavras_chave_ats"])},
