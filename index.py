@@ -124,7 +124,16 @@ def home():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "TalentRadar AI", "database_configured": bool(os.getenv("DATABASE_URL"))}
+    return {
+        "status": "ok",
+        "service": "TalentRadar AI",
+        "environment": os.getenv("VERCEL_ENV", "unknown"),
+        "deployment_url": os.getenv("VERCEL_URL", ""),
+        "commit": os.getenv("VERCEL_GIT_COMMIT_SHA", "")[:12],
+        "app_password_configured": bool(os.getenv("APP_PASSWORD", "")),
+        "session_secret_configured": len(os.getenv("SESSION_SECRET", "").strip()) >= 32,
+        "database_configured": bool(os.getenv("DATABASE_URL", "").strip()),
+    }
 
 
 @app.post("/api/login")
