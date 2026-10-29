@@ -4,7 +4,7 @@ Radar privado de vagas com frontend HTML/CSS/JavaScript, API FastAPI e PostgreSQ
 
 ## Deploy na Vercel
 
-O projeto usa o entrypoint FastAPI em `index.py`. O antigo `app.py` era uma interface Streamlit e deve ser removido do caminho de deploy para não disparar a detecção Python errada.
+O projeto usa o entrypoint FastAPI em `index.py`. O antigo `app.py` era uma interface Streamlit foi removido do caminho de deploy para não disparar a detecção Python errada.
 
 ### Variáveis obrigatórias em Vercel → Settings → Environment Variables
 
