@@ -1,24 +1,17 @@
 from __future__ import annotations
 
-import hmac
 from contextlib import contextmanager
 import json
 import os
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
-from fastapi import FastAPI, HTTPException, Request, Response, Depends
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
-from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from pydantic import BaseModel, Field, field_validator
 
 BASE_DIR = Path(__file__).resolve().parent
-COOKIE_NAME = "talentradar_session"
-SESSION_MAX_AGE = 60 * 60 * 12
-
 app = FastAPI(title="TalentRadar AI API", version="2.0.0")
 
 
@@ -30,16 +23,6 @@ def get_database_url() -> str:
             detail="Banco não configurado. Cadastre DATABASE_URL com uma conexão PostgreSQL persistente.",
         )
     return value
-
-
-def get_serializer() -> URLSafeTimedSerializer:
-    secret = os.getenv("SESSION_SECRET", "").strip()
-    if len(secret) < 32:
-        raise HTTPException(
-            status_code=503,
-            detail="Autenticação não configurada. Defina SESSION_SECRET com pelo menos 32 caracteres.",
-        )
-    return URLSafeTimedSerializer(secret, salt="talentradar-auth-v1")
 
 
 @contextmanager
@@ -72,23 +55,6 @@ def db_connect():
         yield conn
     finally:
         conn.close()
-
-
-def require_auth(request: Request) -> dict[str, Any]:
-    token = request.cookies.get(COOKIE_NAME, "")
-    if not token:
-        raise HTTPException(status_code=401, detail="Faça login para continuar.")
-    try:
-        data = get_serializer().loads(token, max_age=SESSION_MAX_AGE)
-        if data.get("authenticated") is not True:
-            raise HTTPException(status_code=401, detail="Sessão inválida.")
-        return data
-    except (BadSignature, SignatureExpired):
-        raise HTTPException(status_code=401, detail="Sessão expirada. Entre novamente.")
-
-
-class LoginInput(BaseModel):
-    password: str = Field(min_length=1, max_length=256)
 
 
 class JobInput(BaseModel):
@@ -130,48 +96,12 @@ def health():
         "environment": os.getenv("VERCEL_ENV", "unknown"),
         "deployment_url": os.getenv("VERCEL_URL", ""),
         "commit": os.getenv("VERCEL_GIT_COMMIT_SHA", "")[:12],
-        "app_password_configured": bool(os.getenv("APP_PASSWORD", "")),
-        "session_secret_configured": len(os.getenv("SESSION_SECRET", "").strip()) >= 32,
         "database_configured": bool(os.getenv("DATABASE_URL", "").strip()),
     }
 
 
-@app.post("/api/login")
-def login(payload: LoginInput, request: Request, response: Response):
-    expected = os.getenv("APP_PASSWORD", "")
-    if not expected:
-        raise HTTPException(status_code=503, detail="Defina APP_PASSWORD nas variáveis de ambiente da Vercel.")
-    if len(os.getenv("SESSION_SECRET", "")) < 32:
-        raise HTTPException(status_code=503, detail="Defina SESSION_SECRET com pelo menos 32 caracteres.")
-    if not hmac.compare_digest(payload.password.encode("utf-8"), expected.encode("utf-8")):
-        raise HTTPException(status_code=401, detail="Senha incorreta.")
-    token = get_serializer().dumps({"authenticated": True, "issued_at": datetime.now(timezone.utc).isoformat()})
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
-        max_age=SESSION_MAX_AGE,
-        httponly=True,
-        secure=request.url.scheme == "https" or os.getenv("VERCEL") == "1",
-        samesite="strict",
-        path="/",
-    )
-    return {"ok": True}
-
-
-@app.post("/api/logout")
-def logout(response: Response):
-    response.delete_cookie(COOKIE_NAME, path="/", httponly=True, secure=os.getenv("VERCEL") == "1", samesite="strict")
-    return {"ok": True}
-
-
-@app.get("/api/session")
-def session(_: dict = Depends(require_auth)):
-    return {"authenticated": True}
-
-
 @app.get("/api/jobs")
 def list_jobs(
-    _: dict = Depends(require_auth),
     q: str = "",
     categoria: str = "",
     fit_min: int = 0,
@@ -211,7 +141,7 @@ def list_jobs(
 
 
 @app.post("/api/jobs", status_code=201)
-def create_job(payload: JobInput, _: dict = Depends(require_auth)):
+def create_job(payload: JobInput):
     values = payload.model_dump()
     with db_connect() as conn:
         with conn.cursor() as cur:
@@ -233,7 +163,7 @@ def create_job(payload: JobInput, _: dict = Depends(require_auth)):
 
 
 @app.delete("/api/jobs/{job_id}")
-def delete_job(job_id: int, _: dict = Depends(require_auth)):
+def delete_job(job_id: int):
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM jobs WHERE id = %s RETURNING id", (job_id,))
