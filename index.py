@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hmac
+from contextlib import contextmanager
 import json
 import os
 from datetime import datetime, timezone
@@ -12,7 +13,7 @@ from psycopg.rows import dict_row
 from fastapi import FastAPI, HTTPException, Request, Response, Depends
 from fastapi.responses import FileResponse, JSONResponse
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 BASE_DIR = Path(__file__).resolve().parent
 COOKIE_NAME = "talentradar_session"
@@ -41,6 +42,7 @@ def get_serializer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(secret, salt="talentradar-auth-v1")
 
 
+@contextmanager
 def db_connect():
     conn = psycopg.connect(get_database_url(), row_factory=dict_row, connect_timeout=8)
     try:
@@ -183,9 +185,13 @@ def list_jobs(
         for key in ("data_coleta", "created_at"):
             if row.get(key):
                 row[key] = row[key].isoformat()
-        if isinstance(row.get("salario_num"), object) and row.get("salario_num") is not None:
+        if row.get("salario_num") is not None:
             row["salario_num"] = float(row["salario_num"])
-    return {"items": rows, "count": len(rows)}
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT categoria FROM jobs WHERE categoria <> '' ORDER BY categoria")
+            categories = [item["categoria"] for item in cur.fetchall()]
+    return {"items": rows, "count": len(rows), "categories": categories}
 
 
 @app.post("/api/jobs", status_code=201)
