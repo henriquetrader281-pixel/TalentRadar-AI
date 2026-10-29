@@ -49,6 +49,6 @@ Abra http://127.0.0.1:8000.
 
 ## Limitações conhecidas
 
-- Esta versão não faz scraping automático. As entradas antigas de `job_sources.py` eram uma pequena lista embutida de exemplos e não são tratadas como vagas reais.
+- Esta versão não faz scraping automático. O módulo antigo `job_sources.py`, que continha vagas demonstrativas e contatos de exemplo, foi removido para evitar dados fictícios no repositório.
 - A aderência é informada pelo usuário ao cadastrar a vaga; não é uma avaliação automática de currículo nesta versão.
 - Configure proteção contra tentativas repetidas de login e mantenha a senha/segredo fortes. Para uso multiusuário, implemente identidade individual e controle de acesso por usuário.
