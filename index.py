@@ -13,7 +13,7 @@ from psycopg.rows import dict_row
 from fastapi import FastAPI, HTTPException, Request, Response, Depends
 from fastapi.responses import FileResponse, JSONResponse
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 BASE_DIR = Path(__file__).resolve().parent
 COOKIE_NAME = "talentradar_session"
@@ -105,6 +105,13 @@ class JobInput(BaseModel):
     palavras_chave_ats: list[str] = Field(default_factory=list, max_length=100)
     observacoes: str = Field(default="", max_length=5000)
     origem: str = Field(default="Manual", max_length=100)
+
+    @field_validator("link", "link_whatsapp")
+    @classmethod
+    def validate_web_urls(cls, value: str) -> str:
+        if value and not value.lower().startswith(("https://", "http://")):
+            raise ValueError("Os links devem começar com http:// ou https://.")
+        return value
 
 
 @app.get("/")
